@@ -62,7 +62,7 @@ struct CheckCommand: ParsableCommand {
         logMatch(match)
 
         if match.severity == .error, !quiet {
-            throw ExitCode.failure
+            throw ExitCode(ruleConfig.exitCode)
         }
     }
 
