@@ -5,51 +5,79 @@ import Testing
 struct ConfigParseScenario: CustomTestStringConvertible {
     let label: String
     let yaml: String
-    let expectedConfig: ThresholdConfig?
+    let expectedConfig: RuleConfig?
 
     var testDescription: String {
         label
     }
 }
 
-/// Parameterized scenario for config merging.
-struct ConfigMergeScenario: CustomTestStringConvertible {
-    let label: String
-    let yamlConfig: ThresholdConfig?
-    let cliAdded: Int?
-    let cliDeleted: Int?
-    let cliFiles: Int?
-    let expectedConfig: ThresholdConfig
-
-    var testDescription: String {
-        label
-    }
-}
-
-@Suite("ConfigLoader parses YAML and merges with CLI overrides following precedence rules")
+@Suite("ConfigLoader parses rule-based YAML config")
 struct ConfigLoaderTests {
     static let parseScenarios: [ConfigParseScenario] = [
         ConfigParseScenario(
-            label: "parses valid YAML with all fields",
+            label: "parses rule config with resolution and nested conditions",
             yaml: """
-            added: 200
-            deleted: 150
-            files: 5
-            message: Please commit before this grows further.
+            version: 1
+            resolution: first-match
+            rules:
+              - severity: error
+                message: Commit now.
+                when:
+                  or:
+                    - metric: added
+                      gte: 300
+                    - metric: files
+                      gte: 12
+              - severity: warning
+                message: Make a checkpoint commit.
+                when:
+                  and:
+                    - metric: added
+                      gte: 100
+                    - metric: deleted
+                      gte: 50
             """,
-            expectedConfig: ThresholdConfig(
-                added: 200,
-                deleted: 150,
-                filesChanged: 5,
-                message: "Please commit before this grows further."
+            expectedConfig: RuleConfig(
+                rules: [
+                    NagRule(
+                        severity: .error,
+                        message: "Commit now.",
+                        when: .either([
+                            .metric(MetricCondition(metric: .added, gte: 300)),
+                            .metric(MetricCondition(metric: .files, gte: 12)),
+                        ])
+                    ),
+                    NagRule(
+                        severity: .warning,
+                        message: "Make a checkpoint commit.",
+                        when: .and([
+                            .metric(MetricCondition(metric: .added, gte: 100)),
+                            .metric(MetricCondition(metric: .deleted, gte: 50)),
+                        ])
+                    ),
+                ]
             )
         ),
         ConfigParseScenario(
-            label: "parses YAML with partial fields and missing ones are nil",
+            label: "defaults version and resolution when omitted",
             yaml: """
-            added: 50
+            rules:
+              - severity: info
+                message: Good checkpoint.
+                when:
+                  metric: added
+                  gte: 80
             """,
-            expectedConfig: ThresholdConfig(added: 50, deleted: nil, filesChanged: nil)
+            expectedConfig: RuleConfig(
+                rules: [
+                    NagRule(
+                        severity: .info,
+                        message: "Good checkpoint.",
+                        when: .metric(MetricCondition(metric: .added, gte: 80))
+                    ),
+                ]
+            )
         ),
         ConfigParseScenario(
             label: "returns nil for empty YAML",
@@ -63,57 +91,8 @@ struct ConfigLoaderTests {
         ),
     ]
 
-    static let mergeScenarios: [ConfigMergeScenario] = [
-        ConfigMergeScenario(
-            label: "CLI options override YAML values",
-            yamlConfig: ThresholdConfig(added: 200, deleted: 150, filesChanged: 5),
-            cliAdded: 50,
-            cliDeleted: nil,
-            cliFiles: 10,
-            expectedConfig: ThresholdConfig(added: 50, deleted: 150, filesChanged: 10)
-        ),
-        ConfigMergeScenario(
-            label: "YAML values fill in when CLI options are nil",
-            yamlConfig: ThresholdConfig(
-                added: 200,
-                deleted: nil,
-                filesChanged: 5,
-                message: "Commit now."
-            ),
-            cliAdded: nil,
-            cliDeleted: nil,
-            cliFiles: nil,
-            expectedConfig: ThresholdConfig(
-                added: 200,
-                deleted: 100,
-                filesChanged: 5,
-                message: "Commit now."
-            )
-        ),
-        ConfigMergeScenario(
-            label: "built-in defaults used when both YAML and CLI are absent",
-            yamlConfig: nil,
-            cliAdded: nil,
-            cliDeleted: nil,
-            cliFiles: nil,
-            expectedConfig: ThresholdConfig()
-        ),
-    ]
-
     @Test("Parse config YAML", arguments: parseScenarios)
     func parseYaml(scenario: ConfigParseScenario) {
         #expect(ConfigLoader.parse(scenario.yaml) == scenario.expectedConfig)
-    }
-
-    @Test("Merge config sources", arguments: mergeScenarios)
-    func mergeConfig(scenario: ConfigMergeScenario) {
-        let merged = ConfigLoader.merge(
-            yamlConfig: scenario.yamlConfig,
-            cliAdded: scenario.cliAdded,
-            cliDeleted: scenario.cliDeleted,
-            cliFiles: scenario.cliFiles
-        )
-
-        #expect(merged == scenario.expectedConfig)
     }
 }

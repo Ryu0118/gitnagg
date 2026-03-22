@@ -19,12 +19,13 @@ CLI tool that monitors uncommitted git changes and nags you to commit when thres
 
 ## Configuration
 
-Thresholds are resolved in order: CLI options > `.gitnagg.yml` > built-in defaults (100/100/3).
+gitnagg uses ordered rules instead of built-in thresholds.
 
-- `.gitnagg.yml` — Project-level config file, auto-loaded from cwd
-- `.gitnagg.yml` may also define `message` for a custom nag body when no CLI threshold overrides are used
+- `.gitnagg.yml` — Project-level rule config, auto-loaded from cwd
+- `resolution: first-match` — Explicit top-to-bottom rule priority in YAML
+- `when` supports a single metric condition or nested `and` / `or`
 - `--config <path>` — Explicit config path override
-- `--added`, `--deleted`, `--files` — Per-invocation CLI overrides
+- `--metric`, `--gte`, `--severity`, `--message` — Single-rule CLI shortcut for simple conditions
 
 ## Code Style
 

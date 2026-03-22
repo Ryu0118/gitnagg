@@ -1,40 +1,29 @@
-/// Evaluates git diff stats against configured thresholds and produces a nag result.
+/// Evaluates git diff stats against configured ordered rules.
 package struct CheckRunner {
     private let diffProvider: any GitDiffProvider
-    private let config: ThresholdConfig
+    private let config: RuleConfig
 
     /// Production initializer with default implementations.
     package init(
-        config: ThresholdConfig = ThresholdConfig(),
+        config: RuleConfig = RuleConfig(rules: []),
         diffProvider: any GitDiffProvider = DefaultGitDiffProvider()
     ) {
         self.config = config
         self.diffProvider = diffProvider
     }
 
-    /// Runs the threshold check and returns the result.
-    package func run() throws -> NagResult {
+    /// Runs the rule check and returns the result.
+    package func run() throws -> CheckResult {
         let stats = try diffProvider.diffStats()
-        let violations = evaluate(stats: stats)
-        return NagResult(violations: violations, stats: stats)
+        let match = evaluate(stats: stats)
+        return CheckResult(match: match, stats: stats)
     }
 
-    /// Compares each threshold against the actual diff stats.
-    private func evaluate(stats: DiffStats) -> [Violation] {
-        var violations: [Violation] = []
-
-        if let threshold = config.added, stats.added >= threshold {
-            violations.append(Violation(kind: .added, actual: stats.added, threshold: threshold))
+    /// Selects the matching rule according to the configured resolution mode.
+    private func evaluate(stats: DiffStats) -> NagRule? {
+        switch config.resolution {
+        case .firstMatch:
+            config.rules.first { $0.when.matches(stats) }
         }
-        if let threshold = config.deleted, stats.deleted >= threshold {
-            violations.append(Violation(kind: .deleted, actual: stats.deleted, threshold: threshold))
-        }
-        if let threshold = config.filesChanged, stats.filesChanged >= threshold {
-            violations.append(
-                Violation(kind: .filesChanged, actual: stats.filesChanged, threshold: threshold)
-            )
-        }
-
-        return violations
     }
 }

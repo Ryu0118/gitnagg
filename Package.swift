@@ -40,7 +40,10 @@ let package = Package(
         ),
         .testTarget(
             name: "GitNaggKitTests",
-            dependencies: ["GitNaggKit"]
+            dependencies: [
+                "GitNaggCLI",
+                "GitNaggKit",
+            ]
         ),
     ]
 )

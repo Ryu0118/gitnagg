@@ -1,35 +1,81 @@
 import ArgumentParser
 import GitNaggKit
 
-/// Checks uncommitted changes against thresholds and exits non-zero when exceeded.
-///
-/// Threshold resolution order:
-/// 1. CLI options (`--added`, `--deleted`, `--files`)
-/// 2. YAML config file (`.gitnagg.yml` or `--config <path>`)
-/// 3. Built-in defaults (100, 100, 3)
+/// Checks uncommitted changes against configured nag rules.
 struct CheckCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "check",
-        abstract: "Check if uncommitted changes exceed thresholds"
+        abstract: "Check if uncommitted changes match configured nag rules"
     )
 
     @Option(name: .long, help: "Path to YAML config file (default: .gitnagg.yml)")
     var config: String?
 
-    @Option(name: .long, help: "Max added lines before nagging")
-    var added: Int?
+    @Option(name: .long, help: "Simple CLI rule metric: added, deleted, or files")
+    var metric: MetricOption?
 
-    @Option(name: .long, help: "Max deleted lines before nagging")
-    var deleted: Int?
+    @Option(name: .long, help: "Simple CLI rule threshold using >= comparison")
+    var gte: Int?
 
-    @Option(name: .long, help: "Max changed files before nagging")
-    var files: Int?
+    @Option(name: .long, help: "Simple CLI rule severity: info, warning, or error")
+    var severity: SeverityOption?
+
+    @Option(name: .long, help: "Simple CLI rule message")
+    var message: String?
 
     @Flag(name: .shortAndLong, help: "Exit silently with code 0 even when thresholds exceeded")
     var quiet: Bool = false
 
+    func validate() throws {
+        let hasCLICondition = metric != nil || gte != nil || severity != nil || message != nil
+        let isCompleteCLICondition = metric != nil && gte != nil && severity != nil && message != nil
+
+        if hasCLICondition && !isCompleteCLICondition {
+            throw ValidationError(
+                "Simple CLI rules require --metric, --gte, --severity, and --message together."
+            )
+        }
+
+        if config != nil && hasCLICondition {
+            throw ValidationError("Use either --config or the simple CLI rule options, not both.")
+        }
+    }
+
     func run() throws {
-        let hasCLIThresholdOverrides = added != nil || deleted != nil || files != nil
+        try execute(diffProvider: DefaultGitDiffProvider())
+    }
+
+    func execute(diffProvider: any GitDiffProvider) throws {
+        let ruleConfig = try resolveRuleConfig()
+        let runner = CheckRunner(config: ruleConfig, diffProvider: diffProvider)
+        let result = try runner.run()
+
+        guard let match = result.match else {
+            if ruleConfig.rules.isEmpty {
+                logger.info("No rules configured.")
+            } else {
+                logger.info("All clear — no rules matched.")
+            }
+            return
+        }
+
+        logMatch(match)
+
+        if match.severity == .error, !quiet {
+            throw ExitCode.failure
+        }
+    }
+
+    private func resolveRuleConfig() throws -> RuleConfig {
+        if let metric, let gte, let severity, let message {
+            return RuleConfig.singleRule(
+                metric: metric.value,
+                gte: gte,
+                severity: severity.value,
+                message: message
+            )
+        }
+
         let yamlPath = config ?? ConfigLoader.defaultFileName
         let yamlConfig = ConfigLoader.load(from: yamlPath)
 
@@ -37,27 +83,51 @@ struct CheckCommand: ParsableCommand {
             logger.warning("Config file not found: \(yamlPath)")
         }
 
-        let resolved = ConfigLoader.merge(
-            yamlConfig: yamlConfig,
-            cliAdded: added,
-            cliDeleted: deleted,
-            cliFiles: files
-        )
+        return yamlConfig ?? RuleConfig(rules: [])
+    }
 
-        let runner = CheckRunner(config: resolved)
-        let result = try runner.run()
+    private func logMatch(_ match: NagRule) {
+        switch match.severity {
+        case .info:
+            logger.info("\(match.message)", metadata: .plainOutput)
+        case .warning:
+            logger.warning("\(match.message)", metadata: .plainOutput)
+        case .error:
+            logger.error("\(match.message)", metadata: .plainOutput)
+        }
+    }
+}
 
-        if let message = NagMessageResolver.resolve(
-            result: result,
-            config: resolved,
-            hasCLIThresholdOverrides: hasCLIThresholdOverrides
-        ) {
-            logger.warning("\(message)", metadata: .plainOutput)
-            if !quiet {
-                throw ExitCode.failure
-            }
-        } else {
-            logger.info("All clear — changes are within thresholds.")
+enum MetricOption: String, ExpressibleByArgument {
+    case added
+    case deleted
+    case files
+
+    var value: DiffMetric {
+        switch self {
+        case .added:
+            .added
+        case .deleted:
+            .deleted
+        case .files:
+            .files
+        }
+    }
+}
+
+enum SeverityOption: String, ExpressibleByArgument {
+    case info
+    case warning
+    case error
+
+    var value: RuleSeverity {
+        switch self {
+        case .info:
+            .info
+        case .warning:
+            .warning
+        case .error:
+            .error
         }
     }
 }
