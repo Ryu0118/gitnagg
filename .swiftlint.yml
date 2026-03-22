@@ -1,6 +1,3 @@
-# SwiftLint configuration for gitnagg
-# https://realm.github.io/SwiftLint/rule-directory.html
-
 excluded:
   - .build
   - .swiftpm
