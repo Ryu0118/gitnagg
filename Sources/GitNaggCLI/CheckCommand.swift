@@ -42,8 +42,12 @@ struct CheckCommand: ParsableCommand {
     }
 
     func run() throws {
+        try execute(diffProvider: DefaultGitDiffProvider())
+    }
+
+    func execute(diffProvider: any GitDiffProvider) throws {
         let ruleConfig = try resolveRuleConfig()
-        let runner = CheckRunner(config: ruleConfig)
+        let runner = CheckRunner(config: ruleConfig, diffProvider: diffProvider)
         let result = try runner.run()
 
         guard let match = result.match else {
