@@ -29,8 +29,6 @@ struct CheckCommand: ParsableCommand {
     var quiet: Bool = false
 
     func run() throws {
-        bootstrapLogging()
-
         let yamlPath = config ?? ConfigLoader.defaultFileName
         let yamlConfig = ConfigLoader.load(from: yamlPath)
 
