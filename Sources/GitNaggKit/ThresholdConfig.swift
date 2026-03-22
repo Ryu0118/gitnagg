@@ -1,6 +1,6 @@
 /// Configurable thresholds that trigger a commit reminder.
 /// Any threshold set to `nil` is ignored.
-package struct ThresholdConfig: Equatable {
+package struct ThresholdConfig: Codable, Equatable {
     /// Maximum added lines before nagging.
     package let added: Int?
     /// Maximum deleted lines before nagging.
@@ -20,5 +20,12 @@ package struct ThresholdConfig: Equatable {
         self.deleted = deleted
         self.filesChanged = filesChanged
         self.message = message
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case added
+        case deleted
+        case filesChanged = "files"
+        case message
     }
 }
