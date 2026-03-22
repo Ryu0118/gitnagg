@@ -58,6 +58,8 @@ Place a `.gitnagg.yml` in your project root. gitnagg automatically reads it when
 added: 100     # Max added lines before nagging
 deleted: 100   # Max deleted lines before nagging
 files: 3       # Max changed files before nagging
+message: |     # Optional custom nag text shown verbatim when YAML drives the thresholds
+  Commit before this gets harder to review.
 ```
 
 ### Threshold resolution order
@@ -67,6 +69,7 @@ files: 3       # Max changed files before nagging
 3. **Built-in defaults** — `added: 100`, `deleted: 100`, `files: 3`
 
 CLI options override YAML values per-field. Unspecified fields fall through to YAML, then to defaults.
+The optional YAML `message` is only used when no CLI threshold overrides are passed. If you pass `--added`, `--deleted`, or `--files`, gitnagg falls back to the built-in default warning text.
 
 ## Usage
 
@@ -99,6 +102,8 @@ With `--quiet`, gitnagg still prints the warning to stderr but always exits with
 
 ### Example Output
 
+With CLI thresholds or without a YAML `message`:
+
 ```
 [gitnagg] Uncommitted changes are piling up! Consider committing.
 
@@ -106,6 +111,22 @@ With `--quiet`, gitnagg still prints the warning to stderr but always exits with
   ⚠ Changed files: 5 (threshold: 3)
 
   Stats: +150 -20 in 5 file(s)
+```
+
+With YAML `message`, the configured text is emitted verbatim to stderr with no logger prefixing:
+
+```yaml
+added: 100
+deleted: 100
+files: 3
+message: |
+  Please commit before continuing.
+  Keep the diff reviewable.
+```
+
+```text
+Please commit before continuing.
+Keep the diff reviewable.
 ```
 
 ## Hook Integration

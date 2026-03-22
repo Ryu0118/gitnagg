@@ -29,11 +29,13 @@ package enum ConfigLoader {
         let added = dict["added"] as? Int
         let deleted = dict["deleted"] as? Int
         let filesChanged = dict["files"] as? Int
+        let message = dict["message"] as? String
 
         return ThresholdConfig(
             added: added,
             deleted: deleted,
-            filesChanged: filesChanged
+            filesChanged: filesChanged,
+            message: message
         )
     }
 
@@ -52,7 +54,8 @@ package enum ConfigLoader {
         return ThresholdConfig(
             added: cliAdded ?? yaml.added ?? defaults.added,
             deleted: cliDeleted ?? yaml.deleted ?? defaults.deleted,
-            filesChanged: cliFiles ?? yaml.filesChanged ?? defaults.filesChanged
+            filesChanged: cliFiles ?? yaml.filesChanged ?? defaults.filesChanged,
+            message: yaml.message
         )
     }
 }
