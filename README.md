@@ -131,17 +131,17 @@ The CLI rule options are intentionally limited to one simple condition. Use YAML
 
 ### `--quiet` flag
 
-By default, gitnagg exits with code **1** only when the matched rule uses `severity: error`. This can block Claude Code hooks or CI pipelines for the rules you consider hard stops.
+By default, gitnagg exits with code **2** when the matched rule uses `severity: error`. This is designed for Claude Code hooks, where exit code 2 makes the message visible to the assistant as a blocking error.
 
 With `--quiet`, gitnagg still prints the matched message to stderr but always exits with code **0**. Use this in hooks so the warning is visible without interrupting the workflow.
 
 ### `exit_code` (YAML)
 
-By default, gitnagg exits with code **1** when an error rule matches. Claude Code hooks require exit code **2** for blocking errors whose message is visible to the assistant. Set `exit_code: 2` in `.gitnagg.yml` to enable this:
+The default exit code is **2**, which works out of the box with Claude Code hooks. To use a different exit code (e.g., `1` for traditional CI pipelines), set `exit_code` in `.gitnagg.yml`:
 
 ```yaml
 version: 1
-exit_code: 2
+exit_code: 1  # override default (2) for CI pipelines
 rules:
   - severity: error
     message: Diff too large. Split before continuing.
@@ -155,8 +155,7 @@ rules:
 | Code | Meaning |
 |------|---------|
 | 0 | No rule matched, a non-error rule matched, or `--quiet` flag was used |
-| 1 | An `error` rule matched without `--quiet` (default) |
-| 2 | An `error` rule matched with `exit_code: 2` — Claude Code sees the message as a blocking error |
+| 2 | An `error` rule matched without `--quiet` (default) — Claude Code sees the message as a blocking error |
 
 ### Example Output
 
@@ -188,13 +187,7 @@ Add to `.claude/settings.json` (project or user level):
 }
 ```
 
-Set `exit_code: 2` in `.gitnagg.yml` so Claude Code receives the matched message as a **blocking error** — the assistant will see the full warning and can decide to commit before continuing:
-
-```yaml
-exit_code: 2
-```
-
-Without `exit_code: 2`, the hook exits with code 1 and Claude Code only sees a generic error label without the message content.
+The default exit code is **2**, so Claude Code receives the matched message as a **blocking error** out of the box — no extra configuration needed.
 
 Rules are read from `.gitnagg.yml` in the project root automatically.
 

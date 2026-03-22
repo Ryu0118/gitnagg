@@ -99,7 +99,7 @@ struct CheckCommandTests {
                 try scenario.command.execute(diffProvider: provider)
                 Issue.record("Expected ExitCode.failure but command completed successfully.")
             } catch let error as ExitCode {
-                #expect(error == .failure)
+                #expect(error == ExitCode(2))
             } catch {
                 Issue.record("Expected ExitCode.failure but got \(error).")
             }
