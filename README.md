@@ -135,12 +135,28 @@ By default, gitnagg exits with code **1** only when the matched rule uses `sever
 
 With `--quiet`, gitnagg still prints the matched message to stderr but always exits with code **0**. Use this in hooks so the warning is visible without interrupting the workflow.
 
+### `exit_code` (YAML)
+
+By default, gitnagg exits with code **1** when an error rule matches. Claude Code hooks require exit code **2** for blocking errors whose message is visible to the assistant. Set `exit_code: 2` in `.gitnagg.yml` to enable this:
+
+```yaml
+version: 1
+exit_code: 2
+rules:
+  - severity: error
+    message: Diff too large. Split before continuing.
+    when:
+      metric: added
+      gte: 700
+```
+
 ### Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | No rule matched, a non-error rule matched, or `--quiet` flag was used |
-| 1 | An `error` rule matched without `--quiet` |
+| 1 | An `error` rule matched without `--quiet` (default) |
+| 2 | An `error` rule matched with `exit_code: 2` — Claude Code sees the message as a blocking error |
 
 ### Example Output
 
@@ -163,7 +179,7 @@ Add to `.claude/settings.json` (project or user level):
         "hooks": [
           {
             "type": "command",
-            "command": "gitnagg check --quiet"
+            "command": "gitnagg check"
           }
         ]
       }
@@ -172,9 +188,15 @@ Add to `.claude/settings.json` (project or user level):
 }
 ```
 
-Rules are read from `.gitnagg.yml` in the project root automatically.
+Set `exit_code: 2` in `.gitnagg.yml` so Claude Code receives the matched message as a **blocking error** — the assistant will see the full warning and can decide to commit before continuing:
 
-When a rule matches, its message is printed to stderr as hook output, reminding Claude (and you) to commit.
+```yaml
+exit_code: 2
+```
+
+Without `exit_code: 2`, the hook exits with code 1 and Claude Code only sees a generic error label without the message content.
+
+Rules are read from `.gitnagg.yml` in the project root automatically.
 
 ## License
 
