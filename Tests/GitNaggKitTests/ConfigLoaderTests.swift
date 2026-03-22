@@ -103,7 +103,7 @@ struct ConfigLoaderTests {
             )
         ),
         ConfigParseScenario(
-            label: "defaults exit_code to 1 when omitted",
+            label: "defaults exit_code to 2 when omitted",
             yaml: """
             rules:
               - severity: error
@@ -113,7 +113,7 @@ struct ConfigLoaderTests {
                   gte: 100
             """,
             expectedConfig: RuleConfig(
-                exitCode: 1,
+                exitCode: 2,
                 rules: [
                     NagRule(
                         severity: .error,
