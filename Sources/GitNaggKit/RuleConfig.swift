@@ -4,16 +4,20 @@ package struct RuleConfig: Codable, Equatable {
     package let version: Int
     /// How to resolve multiple matching rules.
     package let resolution: ResolutionMode
+    /// Exit code to use when an error-severity rule matches (default: 1).
+    package let exitCode: Int32
     /// Ordered rules to evaluate.
     package let rules: [NagRule]
 
     package init(
         version: Int = 1,
         resolution: ResolutionMode = .firstMatch,
+        exitCode: Int32 = 1,
         rules: [NagRule]
     ) {
         self.version = version
         self.resolution = resolution
+        self.exitCode = exitCode
         self.rules = rules
     }
 
@@ -37,6 +41,7 @@ package struct RuleConfig: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case version
         case resolution
+        case exitCode = "exit_code"
         case rules
     }
 
@@ -44,6 +49,7 @@ package struct RuleConfig: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
         resolution = try container.decodeIfPresent(ResolutionMode.self, forKey: .resolution) ?? .firstMatch
+        exitCode = try container.decodeIfPresent(Int32.self, forKey: .exitCode) ?? 1
         rules = try container.decodeIfPresent([NagRule].self, forKey: .rules) ?? []
     }
 }

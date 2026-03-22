@@ -80,6 +80,50 @@ struct ConfigLoaderTests {
             )
         ),
         ConfigParseScenario(
+            label: "parses exit_code from YAML",
+            yaml: """
+            version: 1
+            exit_code: 2
+            rules:
+              - severity: error
+                message: Stop.
+                when:
+                  metric: added
+                  gte: 100
+            """,
+            expectedConfig: RuleConfig(
+                exitCode: 2,
+                rules: [
+                    NagRule(
+                        severity: .error,
+                        message: "Stop.",
+                        when: .metric(MetricCondition(metric: .added, gte: 100))
+                    ),
+                ]
+            )
+        ),
+        ConfigParseScenario(
+            label: "defaults exit_code to 1 when omitted",
+            yaml: """
+            rules:
+              - severity: error
+                message: Stop.
+                when:
+                  metric: added
+                  gte: 100
+            """,
+            expectedConfig: RuleConfig(
+                exitCode: 1,
+                rules: [
+                    NagRule(
+                        severity: .error,
+                        message: "Stop.",
+                        when: .metric(MetricCondition(metric: .added, gte: 100))
+                    ),
+                ]
+            )
+        ),
+        ConfigParseScenario(
             label: "returns nil for empty YAML",
             yaml: "",
             expectedConfig: nil
