@@ -32,6 +32,7 @@ package struct GitNaggLogHandler: LogHandler {
         set { handler[metadataKey: metadataKey] = newValue }
     }
 
+    // swiftlint:disable:next function_parameter_count
     package func log(
         level: Logger.Level,
         message: Logger.Message,
@@ -73,9 +74,7 @@ package struct GitNaggLogHandler: LogHandler {
     }
 
     private static func writePlainMessage(_ message: String) {
-        guard let data = "\(message)\n".data(using: .utf8) else {
-            return
-        }
+        let data = Data("\(message)\n".utf8)
         FileHandle.standardError.write(data)
     }
 }
