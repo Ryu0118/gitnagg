@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey?style=flat-square)](https://github.com/Ryu0118/gitnagg/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-007ec6?style=flat-square)](LICENSE)
 
-A CLI tool that monitors uncommitted git changes and warns you when thresholds are exceeded. Designed as a hook executable for **Claude Code Hooks**.
+A CLI tool that monitors uncommitted git changes and warns you when ordered rules match. Designed as a hook executable for **Claude Code Hooks**.
 
 ## Install
 
@@ -53,80 +53,101 @@ swift build -c release
 
 Place a `.gitnagg.yml` in your project root. gitnagg automatically reads it when no `--config` option is given.
 
+Rules are evaluated from top to bottom. With `resolution: first-match`, the first matching rule wins. That makes the priority explicit in the YAML itself.
+
 ```yaml
-# .gitnagg.yml
-added: 100     # Max added lines before nagging
-deleted: 100   # Max deleted lines before nagging
-files: 3       # Max changed files before nagging
-message: |     # Optional custom nag text shown verbatim when YAML drives the thresholds
-  Commit before this gets harder to review.
+version: 1
+resolution: first-match
+
+rules:
+  - severity: error
+    message: Commit now. This diff is already painful to review.
+    when:
+      or:
+        - metric: added
+          gte: 300
+        - metric: deleted
+          gte: 180
+        - metric: files
+          gte: 12
+
+  - severity: warning
+    message: This is a good checkpoint. Commit before the diff gets harder to reason about.
+    when:
+      and:
+        - metric: added
+          gte: 100
+        - metric: deleted
+          gte: 50
+        - metric: files
+          gte: 3
+
+  - severity: warning
+    message: The diff is spreading out. Make a checkpoint commit soon.
+    when:
+      or:
+        - metric: added
+          gte: 180
+        - metric: files
+          gte: 8
+
+  - severity: info
+    message: You have enough local change to justify a checkpoint commit.
+    when:
+      metric: added
+      gte: 80
 ```
 
-### Threshold resolution order
+### Rule semantics
 
-1. **CLI options** (`--added`, `--deleted`, `--files`) — highest priority
-2. **YAML config file** (`.gitnagg.yml` or path given by `--config`)
-3. **Built-in defaults** — `added: 100`, `deleted: 100`, `files: 3`
-
-CLI options override YAML values per-field. Unspecified fields fall through to YAML, then to defaults.
-The optional YAML `message` is only used when no CLI threshold overrides are passed. If you pass `--added`, `--deleted`, or `--files`, gitnagg falls back to the built-in default warning text.
+- `rules` are ordered. The first matching rule is the one that is emitted.
+- `when` supports a single condition, `and`, or `or`.
+- Supported metrics are `added`, `deleted`, and `files`.
+- The only comparison operator today is `gte` (`>=`).
+- There are no built-in default rules. If you configure nothing, gitnagg does nothing.
+- `severity: error` exits with code `1` unless `--quiet` is used. `info` and `warning` stay at exit code `0`.
 
 ## Usage
 
 ```bash
-# Uses .gitnagg.yml if present, otherwise built-in defaults
+# Uses .gitnagg.yml if present
 gitnagg check
-
-# Override specific thresholds via CLI
-gitnagg check --added 200 --deleted 150 --files 5
 
 # Use a custom config file
 gitnagg check --config path/to/config.yml
+
+# Simple one-condition rule from the CLI
+gitnagg check \
+  --metric added \
+  --gte 150 \
+  --severity warning \
+  --message "Good checkpoint. Commit before the diff grows further."
 
 # Quiet mode (exit 0 even when thresholds exceeded, just print warning)
 gitnagg check --quiet
 ```
 
+The CLI rule options are intentionally limited to one simple condition. Use YAML for ordered multi-rule setups or `and`/`or` conditions.
+
 ### `--quiet` flag
 
-By default, gitnagg exits with code **1** when any threshold is exceeded. This can block Claude Code hooks or CI pipelines.
+By default, gitnagg exits with code **1** only when the matched rule uses `severity: error`. This can block Claude Code hooks or CI pipelines for the rules you consider hard stops.
 
-With `--quiet`, gitnagg still prints the warning to stderr but always exits with code **0**. Use this in hooks so the warning is visible without interrupting the workflow.
+With `--quiet`, gitnagg still prints the matched message to stderr but always exits with code **0**. Use this in hooks so the warning is visible without interrupting the workflow.
 
 ### Exit Codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | All clear, or `--quiet` flag used |
-| 1 | Thresholds exceeded (without `--quiet`) |
+| 0 | No rule matched, a non-error rule matched, or `--quiet` flag was used |
+| 1 | An `error` rule matched without `--quiet` |
 
 ### Example Output
 
-With CLI thresholds or without a YAML `message`:
-
-```
-[gitnagg] Uncommitted changes are piling up! Consider committing.
-
-  ⚠ Added lines: 150 (threshold: 100)
-  ⚠ Changed files: 5 (threshold: 3)
-
-  Stats: +150 -20 in 5 file(s)
-```
-
-With YAML `message`, the configured text is emitted verbatim to stderr with no logger prefixing:
-
-```yaml
-added: 100
-deleted: 100
-files: 3
-message: |
-  Please commit before continuing.
-  Keep the diff reviewable.
-```
+If the second rule in the sample config matches:
 
 ```text
-Please commit before continuing.
-Keep the diff reviewable.
+This is a good checkpoint. Commit before the diff gets harder to reason about.
 ```
 
 ## Hook Integration
@@ -151,9 +172,9 @@ Add to `.claude/settings.json` (project or user level):
 }
 ```
 
-Thresholds are read from `.gitnagg.yml` in the project root automatically. No need to pass `--added`/`--deleted`/`--files` in the hook command if the config file exists.
+Rules are read from `.gitnagg.yml` in the project root automatically.
 
-When thresholds are exceeded, a warning is printed to stderr as hook output, reminding Claude (and you) to commit.
+When a rule matches, its message is printed to stderr as hook output, reminding Claude (and you) to commit.
 
 ## License
 
