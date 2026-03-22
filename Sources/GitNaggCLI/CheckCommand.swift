@@ -29,6 +29,7 @@ struct CheckCommand: ParsableCommand {
     var quiet: Bool = false
 
     func run() throws {
+        let hasCLIThresholdOverrides = added != nil || deleted != nil || files != nil
         let yamlPath = config ?? ConfigLoader.defaultFileName
         let yamlConfig = ConfigLoader.load(from: yamlPath)
 
@@ -46,8 +47,12 @@ struct CheckCommand: ParsableCommand {
         let runner = CheckRunner(config: resolved)
         let result = try runner.run()
 
-        if let message = NagFormatter.format(result) {
-            logger.warning("\(message)")
+        if let message = NagMessageResolver.resolve(
+            result: result,
+            config: resolved,
+            hasCLIThresholdOverrides: hasCLIThresholdOverrides
+        ) {
+            logger.warning("\(message)", metadata: .plainOutput)
             if !quiet {
                 throw ExitCode.failure
             }

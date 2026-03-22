@@ -22,19 +22,7 @@ package enum ConfigLoader {
 
     /// Parses a YAML string into `ThresholdConfig`.
     package static func parse(_ yaml: String) -> ThresholdConfig? {
-        guard let dict = try? Yams.load(yaml: yaml) as? [String: Any] else {
-            return nil
-        }
-
-        let added = dict["added"] as? Int
-        let deleted = dict["deleted"] as? Int
-        let filesChanged = dict["files"] as? Int
-
-        return ThresholdConfig(
-            added: added,
-            deleted: deleted,
-            filesChanged: filesChanged
-        )
+        try? YAMLDecoder().decode(ThresholdConfig.self, from: yaml)
     }
 
     /// Merges a YAML-loaded config with explicit CLI overrides.
@@ -52,7 +40,8 @@ package enum ConfigLoader {
         return ThresholdConfig(
             added: cliAdded ?? yaml.added ?? defaults.added,
             deleted: cliDeleted ?? yaml.deleted ?? defaults.deleted,
-            filesChanged: cliFiles ?? yaml.filesChanged ?? defaults.filesChanged
+            filesChanged: cliFiles ?? yaml.filesChanged ?? defaults.filesChanged,
+            message: yaml.message
         )
     }
 }

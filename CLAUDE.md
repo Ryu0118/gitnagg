@@ -22,6 +22,7 @@ CLI tool that monitors uncommitted git changes and nags you to commit when thres
 Thresholds are resolved in order: CLI options > `.gitnagg.yml` > built-in defaults (100/100/3).
 
 - `.gitnagg.yml` — Project-level config file, auto-loaded from cwd
+- `.gitnagg.yml` may also define `message` for a custom nag body when no CLI threshold overrides are used
 - `--config <path>` — Explicit config path override
 - `--added`, `--deleted`, `--files` — Per-invocation CLI overrides
 
