@@ -48,7 +48,26 @@ gitnagg uses ordered rules instead of built-in thresholds.
 
 ## Hook Integration
 
-gitnagg is intended to be used as a Claude Code Hook executable in `.claude/settings.json`:
+gitnagg is intended to be used as a Claude Code PostToolUse hook in `.claude/settings.json`.
+
+PostToolUse hooks require **exit 0** and **JSON stdout** (`{"decision":"block","reason":"..."}`) to surface output to Claude. Since gitnagg does not natively output JSON, a wrapper script is needed.
+
+### Wrapper script
+
+Create a wrapper (e.g. `.claude/hooks/gitnagg-hook.sh`):
+
+```bash
+#!/usr/bin/env bash
+OUTPUT=$(gitnagg check --quiet 2>&1)
+if [ $? -ne 0 ] && [ -n "$OUTPUT" ]; then
+    jq -n --arg reason "$OUTPUT" '{"decision":"block","reason":$reason}'
+fi
+exit 0
+```
+
+Make it executable: `chmod +x .claude/hooks/gitnagg-hook.sh`
+
+### settings.json
 
 ```json
 {
@@ -59,7 +78,7 @@ gitnagg is intended to be used as a Claude Code Hook executable in `.claude/sett
         "hooks": [
           {
             "type": "command",
-            "command": "gitnagg check --quiet"
+            "command": ".claude/hooks/gitnagg-hook.sh"
           }
         ]
       }
@@ -67,5 +86,12 @@ gitnagg is intended to be used as a Claude Code Hook executable in `.claude/sett
   }
 }
 ```
+
+### How it works
+
+1. After each Edit/Write, the hook runs `gitnagg check --quiet`
+2. If gitnagg exits non-zero (thresholds exceeded), the wrapper captures stderr+stdout and emits a JSON `block` response
+3. If gitnagg exits 0 (no issues), the wrapper produces no output and exits 0 (hook passes silently)
+4. The wrapper always exits 0 — Claude Code ignores non-zero exit codes from PostToolUse hooks
 
 Thresholds come from `.gitnagg.yml` in the project root. CLI options are only needed to override.
