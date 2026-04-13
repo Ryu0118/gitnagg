@@ -51,10 +51,12 @@ struct CheckCommand: ParsableCommand {
         let result = try runner.run()
 
         guard let match = result.match else {
-            if ruleConfig.rules.isEmpty {
-                logger.info("No rules configured.")
-            } else {
-                logger.info("All clear — no rules matched.")
+            if !quiet {
+                if ruleConfig.rules.isEmpty {
+                    logger.info("No rules configured.")
+                } else {
+                    logger.info("All clear — no rules matched.")
+                }
             }
             return
         }
