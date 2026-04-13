@@ -23,7 +23,7 @@ struct CheckCommand: ParsableCommand {
     @Option(name: .long, help: "Simple CLI rule message")
     var message: String?
 
-    @Flag(name: .shortAndLong, help: "Exit silently with code 0 even when thresholds exceeded")
+    @Flag(name: .shortAndLong, help: "Suppress informational output and exit with code 0 even when thresholds exceeded")
     var quiet: Bool = false
 
     func validate() throws {
