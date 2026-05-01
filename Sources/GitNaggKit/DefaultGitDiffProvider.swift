@@ -4,10 +4,12 @@ import Foundation
 package struct DefaultGitDiffProvider: GitDiffProvider {
     private let workingDirectory: String?
 
+    /// Creates a provider that runs `git` in the given directory, or the current working directory when `nil`.
     package init(workingDirectory: String? = nil) {
         self.workingDirectory = workingDirectory
     }
 
+    /// Runs `git diff --stat HEAD` and returns parsed line and file counts.
     package func diffStats() throws -> DiffStats {
         let output = try run(["diff", "--stat", "HEAD"])
         return parse(output)
