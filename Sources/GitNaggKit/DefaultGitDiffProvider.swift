@@ -13,6 +13,23 @@ package struct DefaultGitDiffProvider: GitDiffProvider {
         return parse(output)
     }
 
+    /// Parses the summary line of `git diff --stat` output.
+    ///
+    /// Example summary: ` 3 files changed, 45 insertions(+), 12 deletions(-)`
+    package static func parse(_ output: String) -> DiffStats {
+        let lines = output.split(separator: "\n")
+        guard let summary = lines.last else {
+            return DiffStats(added: 0, deleted: 0, filesChanged: 0)
+        }
+
+        let text = String(summary)
+        let files = extractNumber(from: text, before: "file")
+        let insertions = extractNumber(from: text, before: "insertion")
+        let deletions = extractNumber(from: text, before: "deletion")
+
+        return DiffStats(added: insertions, deleted: deletions, filesChanged: files)
+    }
+
     /// Runs a git subcommand and returns its stdout.
     private func run(_ arguments: [String]) throws -> String {
         let process = Process()
@@ -31,23 +48,6 @@ package struct DefaultGitDiffProvider: GitDiffProvider {
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8) ?? ""
-    }
-
-    /// Parses the summary line of `git diff --stat` output.
-    ///
-    /// Example summary: ` 3 files changed, 45 insertions(+), 12 deletions(-)`
-    package static func parse(_ output: String) -> DiffStats {
-        let lines = output.split(separator: "\n")
-        guard let summary = lines.last else {
-            return DiffStats(added: 0, deleted: 0, filesChanged: 0)
-        }
-
-        let text = String(summary)
-        let files = extractNumber(from: text, before: "file")
-        let insertions = extractNumber(from: text, before: "insertion")
-        let deletions = extractNumber(from: text, before: "deletion")
-
-        return DiffStats(added: insertions, deleted: deletions, filesChanged: files)
     }
 
     private func parse(_ output: String) -> DiffStats {
