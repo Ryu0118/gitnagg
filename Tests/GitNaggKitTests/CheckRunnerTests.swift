@@ -139,7 +139,7 @@ struct CheckRunnerTests {
         let input = CheckCommandInput(ruleConfig: scenario.config, quiet: false, hookMode: .none)
         let runner = CheckRunner(input: input, diffProvider: mock)
 
-        let result = try runner.run()
+        let result = try runner.evaluate()
 
         #expect(result.match == scenario.expectedMatch)
         #expect((result.match != nil) == (scenario.expectedMatch != nil))

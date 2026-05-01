@@ -27,6 +27,21 @@ package struct CheckRunner {
     }
 
     package func run() throws -> CheckRunResult {
+        if input.hookMode != .none {
+            return runHook()
+        }
+
+        let result = try evaluate()
+        log(result)
+
+        if let exitCode = result.exitCode {
+            throw CheckRunnerError.exitCode(exitCode)
+        }
+
+        return result
+    }
+
+    package func evaluate() throws -> CheckRunResult {
         let stats = try diffProvider.diffStats()
         let match = evaluate(stats: stats)
 
@@ -40,10 +55,50 @@ package struct CheckRunner {
         }
     }
 
+    private func runHook() -> CheckRunResult {
+        do {
+            let result = try evaluate()
+            if let output = result.hookOutput {
+                logger.notice("\(output.jsonString)", metadata: .stdoutOutput)
+            }
+            return result
+        } catch {
+            return CheckRunResult(
+                match: nil,
+                stats: DiffStats(added: 0, deleted: 0, filesChanged: 0),
+                exitCode: nil,
+                hookOutput: nil
+            )
+        }
+    }
+
+    private func log(_ result: CheckRunResult) {
+        guard let match = result.match else {
+            logNoMatch()
+            return
+        }
+
+        match.logMatch()
+    }
+
+    private func logNoMatch() {
+        guard !input.quiet else { return }
+
+        if input.ruleConfig.rules.isEmpty {
+            logger.info("No rules configured.")
+        } else {
+            logger.info("All clear — no rules matched.")
+        }
+    }
+
     private func evaluate(stats: DiffStats) -> NagRule? {
         switch input.ruleConfig.resolution {
         case .firstMatch:
             input.ruleConfig.rules.first { $0.when.matches(stats) }
         }
     }
+}
+
+package enum CheckRunnerError: Error, Equatable {
+    case exitCode(Int32)
 }

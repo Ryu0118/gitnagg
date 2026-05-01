@@ -71,10 +71,8 @@ struct CheckCommand: ParsableCommand {
 
     func execute(diffProvider: any GitDiffProvider) throws {
         let hookMode: HookMode = claudeHook ? .claude : codexHook ? .codex : .none
-
-        let input: CheckCommandInput
         do {
-            input = try CheckArgumentsValidator(
+            let input = try CheckArgumentsValidator(
                 metric: metric?.value,
                 gte: gte,
                 severity: severity?.value,
@@ -83,40 +81,16 @@ struct CheckCommand: ParsableCommand {
                 quiet: quiet,
                 hookMode: hookMode
             ).validate()
+
+            _ = try CheckRunner(input: input, diffProvider: diffProvider).run()
+        } catch let error as CheckRunnerError {
+            switch error {
+            case let .exitCode(exitCode):
+                throw ExitCode(exitCode)
+            }
         } catch {
             if hookMode != .none { return }
             throw error
-        }
-
-        if hookMode != .none {
-            do {
-                let result = try CheckRunner(input: input, diffProvider: diffProvider).run()
-                if let output = result.hookOutput {
-                    logger.notice("\(output.jsonString)", metadata: .stdoutOutput)
-                }
-            } catch {
-                // Swallow errors in hook mode to guarantee exit 0.
-            }
-            return
-        }
-
-        let result = try CheckRunner(input: input, diffProvider: diffProvider).run()
-
-        guard let match = result.match else {
-            if !quiet {
-                if input.ruleConfig.rules.isEmpty {
-                    logger.info("No rules configured.")
-                } else {
-                    logger.info("All clear — no rules matched.")
-                }
-            }
-            return
-        }
-
-        match.logMatch()
-
-        if let exitCode = result.exitCode {
-            throw ExitCode(exitCode)
         }
     }
 }
