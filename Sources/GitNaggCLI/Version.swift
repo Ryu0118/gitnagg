@@ -1,3 +1,3 @@
 enum GitNaggVersion {
-    static let current = "0.2.1"
+    static let current = "0.3.0"
 }
