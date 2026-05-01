@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey?style=flat-square)](https://github.com/Ryu0118/gitnagg/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-007ec6?style=flat-square)](LICENSE)
 
-A CLI tool that monitors uncommitted git changes and warns you when ordered rules match. Designed as a hook executable for **Claude Code Hooks**.
+A CLI tool that monitors uncommitted git changes and warns you when ordered rules match. Designed for local use and as a hook executable for **Claude Code** and **Codex**.
 
 ## Install
 
@@ -105,7 +105,9 @@ rules:
 - Supported metrics are `added`, `deleted`, and `files`.
 - The only comparison operator today is `gte` (`>=`).
 - There are no built-in default rules. If you configure nothing, gitnagg does nothing.
-- `severity: error` exits with code `1` unless `--quiet` is used. `info` and `warning` stay at exit code `0`.
+- In normal CLI mode, `severity: error` exits with the configured `exit_code` (default: `2`) unless `--quiet` is used.
+- In normal CLI mode, `info` and `warning` rules stay at exit code `0`.
+- In hook modes (`--claude-hook` or `--codex-hook`), gitnagg always exits with code `0` and emits hook JSON to stdout only when a rule matches.
 
 ## Usage
 
@@ -125,19 +127,38 @@ gitnagg check \
 
 # Quiet mode (exit 0 even when thresholds exceeded, just print warning)
 gitnagg check --quiet
+
+# Claude Code PostToolUse hook mode
+gitnagg check --claude-hook
+
+# Codex PostToolUse hook mode
+gitnagg check --codex-hook
 ```
 
 The CLI rule options are intentionally limited to one simple condition. Use YAML for ordered multi-rule setups or `and`/`or` conditions.
 
+### Hook flags
+
+Use `--claude-hook` or `--codex-hook` when gitnagg is called from an agent hook.
+
+Both flags:
+
+- Always exit with code **0**, including config or git-diff errors.
+- Emit `{"decision":"block","reason":"..."}` to stdout when a rule matches.
+- Emit nothing when no rule matches.
+- Are mutually exclusive with each other and with `--quiet`.
+
+The output schema is intentionally compatible with Claude Code and Codex `PostToolUse` hooks. Claude Code treats `decision: "block"` as a blocking hook response. Codex treats it as a replacement tool result that the model reads before continuing.
+
 ### `--quiet` flag
 
-By default, gitnagg exits with code **2** when the matched rule uses `severity: error`. This is designed for Claude Code hooks, where exit code 2 makes the message visible to the assistant as a blocking error.
+By default, gitnagg exits with code **2** when the matched rule uses `severity: error`.
 
-With `--quiet`, gitnagg still prints the matched message to stderr but always exits with code **0**. Use this in hooks so the warning is visible without interrupting the workflow.
+With `--quiet`, gitnagg still prints the matched message to stderr but always exits with code **0**. Use hook flags instead of `--quiet` for Claude Code or Codex integration.
 
 ### `exit_code` (YAML)
 
-The default exit code is **2**, which works out of the box with Claude Code hooks. To use a different exit code (e.g., `1` for traditional CI pipelines), set `exit_code` in `.gitnagg.yml`:
+The default exit code is **2**. To use a different exit code (e.g., `1` for traditional CI pipelines), set `exit_code` in `.gitnagg.yml`:
 
 ```yaml
 version: 1
@@ -155,7 +176,9 @@ rules:
 | Code | Meaning |
 |------|---------|
 | 0 | No rule matched, a non-error rule matched, or `--quiet` flag was used |
-| 2 | An `error` rule matched without `--quiet` (default) — Claude Code sees the message as a blocking error |
+| 2 | An `error` rule matched without `--quiet` (default; configurable with `exit_code`) |
+
+Hook modes always exit with code `0`.
 
 ### Example Output
 
@@ -166,6 +189,8 @@ This is a good checkpoint. Commit before the diff gets harder to reason about.
 ```
 
 ## Hook Integration
+
+### Claude Code
 
 Add to `.claude/settings.json` (project or user level):
 
@@ -178,7 +203,7 @@ Add to `.claude/settings.json` (project or user level):
         "hooks": [
           {
             "type": "command",
-            "command": "gitnagg check"
+            "command": "gitnagg check --claude-hook"
           }
         ]
       }
@@ -187,7 +212,32 @@ Add to `.claude/settings.json` (project or user level):
 }
 ```
 
-The default exit code is **2**, so Claude Code receives the matched message as a **blocking error** out of the box — no extra configuration needed.
+When a rule matches, gitnagg emits hook JSON like this to stdout:
+
+```json
+{"decision":"block","reason":"Commit now. This diff is already painful to review."}
+```
+
+Claude Code receives that as a blocking `PostToolUse` response. The process still exits with code `0`, which keeps the JSON parseable by the hook runtime.
+
+### Codex
+
+Enable hooks in Codex and call gitnagg with `--codex-hook` from a `PostToolUse` command hook:
+
+```toml
+[features]
+codex_hooks = true
+
+[[hooks.PostToolUse]]
+matcher = "Edit|Write"
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "gitnagg check --codex-hook"
+timeout = 30
+```
+
+Codex uses the same JSON shape, but `decision: "block"` is provided back to the model as the tool result instead of pausing the session.
 
 Rules are read from `.gitnagg.yml` in the project root automatically.
 
