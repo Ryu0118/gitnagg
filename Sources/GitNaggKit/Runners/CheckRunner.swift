@@ -1,29 +1,49 @@
+/// Outcome produced by CheckRunner.
+package struct CheckRunResult: Equatable {
+    package let match: NagRule?
+    package let stats: DiffStats
+    package let exitCode: Int32?
+    package let hookOutput: ClaudeHookOutput?
+
+    package init(match: NagRule?, stats: DiffStats, exitCode: Int32?, hookOutput: ClaudeHookOutput?) {
+        self.match = match
+        self.stats = stats
+        self.exitCode = exitCode
+        self.hookOutput = hookOutput
+    }
+}
+
 /// Evaluates git diff stats against configured ordered rules.
 package struct CheckRunner {
     private let diffProvider: any GitDiffProvider
-    private let config: RuleConfig
+    private let input: CheckCommandInput
 
-    /// Production initializer with default implementations.
     package init(
-        config: RuleConfig = RuleConfig(rules: []),
+        input: CheckCommandInput,
         diffProvider: any GitDiffProvider = DefaultGitDiffProvider()
     ) {
-        self.config = config
+        self.input = input
         self.diffProvider = diffProvider
     }
 
-    /// Runs the rule check and returns the result.
-    package func run() throws -> CheckResult {
+    package func run() throws -> CheckRunResult {
         let stats = try diffProvider.diffStats()
         let match = evaluate(stats: stats)
-        return CheckResult(match: match, stats: stats)
+
+        switch input.hookMode {
+        case .claude, .codex:
+            let hookOutput = match.map { ClaudeHookOutput(reason: $0.message) }
+            return CheckRunResult(match: match, stats: stats, exitCode: nil, hookOutput: hookOutput)
+        case .none:
+            let exitCode: Int32? = (match?.severity == .error && !input.quiet) ? input.ruleConfig.exitCode : nil
+            return CheckRunResult(match: match, stats: stats, exitCode: exitCode, hookOutput: nil)
+        }
     }
 
-    /// Selects the matching rule according to the configured resolution mode.
     private func evaluate(stats: DiffStats) -> NagRule? {
-        switch config.resolution {
+        switch input.ruleConfig.resolution {
         case .firstMatch:
-            config.rules.first { $0.when.matches(stats) }
+            input.ruleConfig.rules.first { $0.when.matches(stats) }
         }
     }
 }

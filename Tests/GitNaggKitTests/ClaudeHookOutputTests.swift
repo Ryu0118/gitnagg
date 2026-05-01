@@ -19,21 +19,31 @@ struct ClaudeHookOutputTests {
         #expect(output.decision == "block")
     }
 
-    @Test("CheckResult returns claudeHookOutput when rule matched")
-    func checkResultReturnsOutputOnMatch() {
+    @Test("CheckRunResult returns hookOutput when rule matched")
+    func checkRunResultReturnsOutputOnMatch() {
         let condition = MetricCondition(metric: .added, gte: 100)
         let rule = NagRule(severity: .error, message: "Commit now.", when: .metric(condition))
-        let result = CheckResult(match: rule, stats: DiffStats(added: 150, deleted: 0, filesChanged: 1))
-        let output = result.claudeHookOutput
+        let result = CheckRunResult(
+            match: rule,
+            stats: DiffStats(added: 150, deleted: 0, filesChanged: 1),
+            exitCode: nil,
+            hookOutput: ClaudeHookOutput(reason: rule.message)
+        )
+        let output = result.hookOutput
         #expect(output != nil)
         #expect(output?.reason == "Commit now.")
         #expect(output?.decision == "block")
     }
 
-    @Test("CheckResult returns nil claudeHookOutput when no rule matched")
-    func checkResultReturnsNilOnNoMatch() {
-        let result = CheckResult(match: nil, stats: DiffStats(added: 50, deleted: 0, filesChanged: 1))
-        #expect(result.claudeHookOutput == nil)
+    @Test("CheckRunResult returns nil hookOutput when no rule matched")
+    func checkRunResultReturnsNilOnNoMatch() {
+        let result = CheckRunResult(
+            match: nil,
+            stats: DiffStats(added: 50, deleted: 0, filesChanged: 1),
+            exitCode: nil,
+            hookOutput: nil
+        )
+        #expect(result.hookOutput == nil)
     }
 
     @Test("jsonString escapes double quotes in reason")
@@ -69,8 +79,13 @@ struct ClaudeHookOutputTests {
     func jsonStringWarning() {
         let condition = MetricCondition(metric: .added, gte: 50)
         let rule = NagRule(severity: .warning, message: "Good checkpoint.", when: .metric(condition))
-        let result = CheckResult(match: rule, stats: DiffStats(added: 80, deleted: 0, filesChanged: 1))
-        let json = result.claudeHookOutput?.jsonString ?? ""
+        let result = CheckRunResult(
+            match: rule,
+            stats: DiffStats(added: 80, deleted: 0, filesChanged: 1),
+            exitCode: nil,
+            hookOutput: ClaudeHookOutput(reason: rule.message)
+        )
+        let json = result.hookOutput?.jsonString ?? ""
         #expect(json.contains("\"decision\":\"block\""))
         #expect(json.contains("Good checkpoint."))
     }

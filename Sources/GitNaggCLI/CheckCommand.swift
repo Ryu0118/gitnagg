@@ -28,9 +28,15 @@ struct CheckCommand: ParsableCommand {
 
     @Flag(
         name: .long,
-        help: "Emit Claude Code PostToolUse hook JSON to stdout and always exit 0. Ignores --quiet."
+        help: "Emit Claude Code hook JSON to stdout and always exit 0. Mutually exclusive with --codex-hook."
     )
     var claudeHook: Bool = false
+
+    @Flag(
+        name: .long,
+        help: "Emit Codex PostToolUse hook JSON to stdout and always exit 0. Mutually exclusive with --claude-hook."
+    )
+    var codexHook: Bool = false
 
     func validate() throws {
         let hasCLICondition = metric != nil || gte != nil || severity != nil || message != nil
@@ -46,8 +52,16 @@ struct CheckCommand: ParsableCommand {
             throw ValidationError("Use either --config or the simple CLI rule options, not both.")
         }
 
+        if claudeHook, codexHook {
+            throw ValidationError("--claude-hook and --codex-hook are mutually exclusive.")
+        }
+
         if claudeHook, quiet {
             throw ValidationError("--claude-hook and --quiet are mutually exclusive.")
+        }
+
+        if codexHook, quiet {
+            throw ValidationError("--codex-hook and --quiet are mutually exclusive.")
         }
     }
 
@@ -56,11 +70,28 @@ struct CheckCommand: ParsableCommand {
     }
 
     func execute(diffProvider: any GitDiffProvider) throws {
-        if claudeHook {
+        let hookMode: HookMode = claudeHook ? .claude : codexHook ? .codex : .none
+
+        let input: CheckCommandInput
+        do {
+            input = try CheckArgumentsValidator(
+                metric: metric?.value,
+                gte: gte,
+                severity: severity?.value,
+                message: message,
+                config: config,
+                quiet: quiet,
+                hookMode: hookMode
+            ).validate()
+        } catch {
+            if hookMode != .none { return }
+            throw error
+        }
+
+        if hookMode != .none {
             do {
-                let ruleConfig = try resolveRuleConfig()
-                let result = try CheckRunner(config: ruleConfig, diffProvider: diffProvider).run()
-                if let output = result.claudeHookOutput {
+                let result = try CheckRunner(input: input, diffProvider: diffProvider).run()
+                if let output = result.hookOutput {
                     logger.notice("\(output.jsonString)", metadata: .stdoutOutput)
                 }
             } catch {
@@ -69,13 +100,11 @@ struct CheckCommand: ParsableCommand {
             return
         }
 
-        let ruleConfig = try resolveRuleConfig()
-        let runner = CheckRunner(config: ruleConfig, diffProvider: diffProvider)
-        let result = try runner.run()
+        let result = try CheckRunner(input: input, diffProvider: diffProvider).run()
 
         guard let match = result.match else {
             if !quiet {
-                if ruleConfig.rules.isEmpty {
+                if input.ruleConfig.rules.isEmpty {
                     logger.info("No rules configured.")
                 } else {
                     logger.info("All clear — no rules matched.")
@@ -86,29 +115,9 @@ struct CheckCommand: ParsableCommand {
 
         match.logMatch()
 
-        if match.severity == .error, !quiet {
-            throw ExitCode(ruleConfig.exitCode)
+        if let exitCode = result.exitCode {
+            throw ExitCode(exitCode)
         }
-    }
-
-    private func resolveRuleConfig() throws -> RuleConfig {
-        if let metric, let gte, let severity, let message {
-            return RuleConfig.singleRule(
-                metric: metric.value,
-                gte: gte,
-                severity: severity.value,
-                message: message
-            )
-        }
-
-        let yamlPath = config ?? ConfigLoader.defaultFileName
-        let yamlConfig = ConfigLoader.load(from: yamlPath)
-
-        if config != nil, yamlConfig == nil {
-            logger.warning("Config file not found: \(yamlPath)")
-        }
-
-        return yamlConfig ?? RuleConfig(rules: [])
     }
 }
 
