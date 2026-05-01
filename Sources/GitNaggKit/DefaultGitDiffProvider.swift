@@ -4,33 +4,15 @@ import Foundation
 package struct DefaultGitDiffProvider: GitDiffProvider {
     private let workingDirectory: String?
 
+    /// Creates a provider that runs `git` in the given directory, or the current working directory when `nil`.
     package init(workingDirectory: String? = nil) {
         self.workingDirectory = workingDirectory
     }
 
+    /// Runs `git diff --stat HEAD` and returns parsed line and file counts.
     package func diffStats() throws -> DiffStats {
         let output = try run(["diff", "--stat", "HEAD"])
         return parse(output)
-    }
-
-    /// Runs a git subcommand and returns its stdout.
-    private func run(_ arguments: [String]) throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = arguments
-        if let workingDirectory {
-            process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
-        }
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        try process.run()
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8) ?? ""
     }
 
     /// Parses the summary line of `git diff --stat` output.
@@ -48,6 +30,26 @@ package struct DefaultGitDiffProvider: GitDiffProvider {
         let deletions = extractNumber(from: text, before: "deletion")
 
         return DiffStats(added: insertions, deleted: deletions, filesChanged: files)
+    }
+
+    /// Runs a git subcommand and returns its stdout.
+    private func run(_ arguments: [String]) throws -> String {
+        let process = Process()
+        process.executableURL = URL(filePath: "/usr/bin/git")
+        process.arguments = arguments
+        if let workingDirectory {
+            process.currentDirectoryURL = URL(filePath: workingDirectory)
+        }
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        try process.run()
+        process.waitUntilExit()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8) ?? ""
     }
 
     private func parse(_ output: String) -> DiffStats {

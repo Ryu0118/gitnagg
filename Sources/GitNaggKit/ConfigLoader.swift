@@ -5,6 +5,7 @@ import Yams
 ///
 /// Default search path: `.gitnagg.yml` in the current directory.
 package enum ConfigLoader {
+    /// Default config file name searched in the current working directory.
     package static let defaultFileName = ".gitnagg.yml"
 
     /// Loads rules from the YAML file at `path`.

@@ -8,6 +8,7 @@ package struct CheckArgumentsValidator {
     private let quiet: Bool
     private let hookMode: HookMode
 
+    /// Creates a validator with the provided CLI argument values.
     package init(
         metric: DiffMetric?,
         gte: Int?,
@@ -26,6 +27,7 @@ package struct CheckArgumentsValidator {
         self.hookMode = hookMode
     }
 
+    /// Validates the arguments and returns a resolved ``CheckCommandInput``.
     package func validate() throws -> CheckCommandInput {
         let ruleConfig = try resolveRuleConfig()
         return CheckCommandInput(ruleConfig: ruleConfig, quiet: quiet, hookMode: hookMode)

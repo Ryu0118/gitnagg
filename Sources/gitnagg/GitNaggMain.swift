@@ -6,7 +6,7 @@ import Logging
 @main
 struct GitNaggMain {
     static func main() async {
-        bootstrapLogging(level: .info)
+        LoggingBootstrap.bootstrap(level: .info)
         await GitNaggCommand.main(nil)
     }
 }

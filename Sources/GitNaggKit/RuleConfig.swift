@@ -9,6 +9,7 @@ package struct RuleConfig: Codable, Equatable {
     /// Ordered rules to evaluate.
     package let rules: [NagRule]
 
+    /// Creates a `RuleConfig` with the given version, resolution mode, exit code, and rules.
     package init(
         version: Int = 1,
         resolution: ResolutionMode = .firstMatch,
@@ -21,6 +22,7 @@ package struct RuleConfig: Codable, Equatable {
         self.rules = rules
     }
 
+    /// Convenience factory that builds a single-rule config from inline CLI arguments.
     package static func singleRule(
         metric: DiffMetric,
         gte: Int,
@@ -45,6 +47,7 @@ package struct RuleConfig: Codable, Equatable {
         case rules
     }
 
+    /// Decodes a `RuleConfig` from a YAML/JSON container, applying defaults for absent fields.
     package init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
@@ -68,6 +71,7 @@ package struct NagRule: Codable, Equatable {
     /// Condition tree that decides whether the rule matches.
     package let when: RuleCondition
 
+    /// Creates a `NagRule` with the given severity, message, and condition.
     package init(severity: RuleSeverity, message: String, when: RuleCondition) {
         self.severity = severity
         self.message = message
@@ -101,6 +105,7 @@ package enum DiffMetric: String, Codable, Equatable {
     case deleted
     case files
 
+    /// Returns the numeric value of this metric from the given diff stats.
     package func value(in stats: DiffStats) -> Int {
         switch self {
         case .added:
@@ -115,78 +120,19 @@ package enum DiffMetric: String, Codable, Equatable {
 
 /// A single threshold condition against one diff metric.
 package struct MetricCondition: Codable, Equatable {
+    /// The diff metric to compare.
     package let metric: DiffMetric
+    /// The minimum value (inclusive) that triggers a match.
     package let gte: Int
 
+    /// Creates a condition that matches when `metric` is at least `gte`.
     package init(metric: DiffMetric, gte: Int) {
         self.metric = metric
         self.gte = gte
     }
 
+    /// Returns `true` when the metric value in `stats` meets the threshold.
     package func matches(_ stats: DiffStats) -> Bool {
         metric.value(in: stats) >= gte
-    }
-}
-
-/// Recursive rule condition tree.
-package indirect enum RuleCondition: Codable, Equatable {
-    case metric(MetricCondition)
-    case and([RuleCondition])
-    case either([RuleCondition])
-
-    package func matches(_ stats: DiffStats) -> Bool {
-        switch self {
-        case let .metric(condition):
-            condition.matches(stats)
-        case let .and(conditions):
-            conditions.allSatisfy { $0.matches(stats) }
-        case let .either(conditions):
-            conditions.contains { $0.matches(stats) }
-        }
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case metric
-        case gte
-        case and
-        case orKey = "or"
-    }
-
-    package init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        if container.contains(.and) {
-            self = try .and(container.decode([RuleCondition].self, forKey: .and))
-            return
-        }
-
-        if container.contains(.orKey) {
-            self = try .either(container.decode([RuleCondition].self, forKey: .orKey))
-            return
-        }
-
-        if container.contains(.metric) {
-            self = try .metric(MetricCondition(from: decoder))
-            return
-        }
-
-        throw DecodingError.dataCorruptedError(
-            forKey: .metric,
-            in: container,
-            debugDescription: "Rule condition must define either metric/gte, and, or or."
-        )
-    }
-
-    package func encode(to encoder: Encoder) throws {
-        switch self {
-        case let .metric(condition):
-            try condition.encode(to: encoder)
-        case let .and(conditions):
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(conditions, forKey: .and)
-        case let .either(conditions):
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(conditions, forKey: .orKey)
-        }
     }
 }

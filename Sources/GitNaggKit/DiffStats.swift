@@ -7,6 +7,7 @@ package struct DiffStats: Equatable {
     /// Number of files changed.
     package let filesChanged: Int
 
+    /// Creates a `DiffStats` with the given counts.
     package init(added: Int, deleted: Int, filesChanged: Int) {
         self.added = added
         self.deleted = deleted
