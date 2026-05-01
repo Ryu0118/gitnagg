@@ -16,10 +16,10 @@ package struct DefaultGitDiffProvider: GitDiffProvider {
     /// Runs a git subcommand and returns its stdout.
     private func run(_ arguments: [String]) throws -> String {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.executableURL = URL(filePath: "/usr/bin/git")
         process.arguments = arguments
         if let workingDirectory {
-            process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
+            process.currentDirectoryURL = URL(filePath: workingDirectory)
         }
 
         let pipe = Pipe()
