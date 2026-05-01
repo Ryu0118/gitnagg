@@ -123,11 +123,11 @@ package indirect enum RuleCondition: Codable, Equatable {
 
     package func matches(_ stats: DiffStats) -> Bool {
         switch self {
-        case .metric(let condition):
+        case let .metric(condition):
             condition.matches(stats)
-        case .and(let conditions):
+        case let .and(conditions):
             conditions.allSatisfy { $0.matches(stats) }
-        case .either(let conditions):
+        case let .either(conditions):
             conditions.contains { $0.matches(stats) }
         }
     }
@@ -143,17 +143,17 @@ package indirect enum RuleCondition: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         if container.contains(.and) {
-            self = .and(try container.decode([RuleCondition].self, forKey: .and))
+            self = try .and(container.decode([RuleCondition].self, forKey: .and))
             return
         }
 
         if container.contains(.orKey) {
-            self = .either(try container.decode([RuleCondition].self, forKey: .orKey))
+            self = try .either(container.decode([RuleCondition].self, forKey: .orKey))
             return
         }
 
         if container.contains(.metric) {
-            self = .metric(try MetricCondition(from: decoder))
+            self = try .metric(MetricCondition(from: decoder))
             return
         }
 
@@ -166,12 +166,12 @@ package indirect enum RuleCondition: Codable, Equatable {
 
     package func encode(to encoder: Encoder) throws {
         switch self {
-        case .metric(let condition):
+        case let .metric(condition):
             try condition.encode(to: encoder)
-        case .and(let conditions):
+        case let .and(conditions):
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(conditions, forKey: .and)
-        case .either(let conditions):
+        case let .either(conditions):
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(conditions, forKey: .orKey)
         }

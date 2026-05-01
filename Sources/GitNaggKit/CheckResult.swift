@@ -13,4 +13,9 @@ package struct CheckResult: Equatable {
         self.match = match
         self.stats = stats
     }
+
+    /// Returns a Claude Code hook payload when a rule matched, otherwise nil.
+    package var claudeHookOutput: ClaudeHookOutput? {
+        match.map { ClaudeHookOutput(reason: $0.message) }
+    }
 }

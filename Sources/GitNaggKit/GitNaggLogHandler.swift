@@ -1,15 +1,17 @@
 import Foundation
 import Logging
 
-/// A stderr log handler that can emit plain message-only output for user-facing nags.
+/// A log handler that routes plain user-facing nags to stderr and hook JSON to stdout.
 package struct GitNaggLogHandler: LogHandler {
     package static let plainOutputMetadataKey = "gitnagg_output"
     package static let plainOutputMetadataValue = "plain"
+    package static let stdoutOutputMetadataKey = "gitnagg_stdout"
+    package static let stdoutOutputMetadataValue = "stdout"
 
     private var handler: StreamLogHandler
 
     package init(label: String, metadataProvider: Logger.MetadataProvider?) {
-        self.handler = StreamLogHandler.standardError(label: label, metadataProvider: metadataProvider)
+        handler = StreamLogHandler.standardError(label: label, metadataProvider: metadataProvider)
     }
 
     package var logLevel: Logger.Level {
@@ -42,6 +44,11 @@ package struct GitNaggLogHandler: LogHandler {
         function: String,
         line: UInt
     ) {
+        if Self.shouldEmitStdoutMessage(metadata) {
+            Self.writeStdoutMessage(message.description)
+            return
+        }
+
         if Self.shouldEmitPlainMessage(metadata) {
             Self.writePlainMessage(message.description)
             return
@@ -59,28 +66,37 @@ package struct GitNaggLogHandler: LogHandler {
     }
 
     private static func shouldEmitPlainMessage(_ metadata: Logger.Metadata?) -> Bool {
-        guard let value = metadata?[plainOutputMetadataKey] else {
-            return false
-        }
+        matches(metadata, key: plainOutputMetadataKey, value: plainOutputMetadataValue)
+    }
 
-        switch value {
-        case .string(let string):
-            return string == plainOutputMetadataValue
-        case .stringConvertible(let stringConvertible):
-            return stringConvertible.description == plainOutputMetadataValue
-        default:
-            return false
+    private static func shouldEmitStdoutMessage(_ metadata: Logger.Metadata?) -> Bool {
+        matches(metadata, key: stdoutOutputMetadataKey, value: stdoutOutputMetadataValue)
+    }
+
+    private static func matches(_ metadata: Logger.Metadata?, key: String, value: String) -> Bool {
+        guard let entry = metadata?[key] else { return false }
+        switch entry {
+        case let .string(string): return string == value
+        case let .stringConvertible(stringConvertible): return stringConvertible.description == value
+        default: return false
         }
     }
 
     private static func writePlainMessage(_ message: String) {
-        let data = Data("\(message)\n".utf8)
-        FileHandle.standardError.write(data)
+        FileHandle.standardError.write(Data("\(message)\n".utf8))
+    }
+
+    private static func writeStdoutMessage(_ message: String) {
+        FileHandle.standardOutput.write(Data("\(message)\n".utf8))
     }
 }
 
 package extension Logger.Metadata {
     static let plainOutput: Self = [
         GitNaggLogHandler.plainOutputMetadataKey: .string(GitNaggLogHandler.plainOutputMetadataValue),
+    ]
+
+    static let stdoutOutput: Self = [
+        GitNaggLogHandler.stdoutOutputMetadataKey: .string(GitNaggLogHandler.stdoutOutputMetadataValue),
     ]
 }

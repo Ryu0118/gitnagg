@@ -26,18 +26,28 @@ struct CheckCommand: ParsableCommand {
     @Flag(name: .shortAndLong, help: "Suppress informational output and exit with code 0 even when thresholds exceeded")
     var quiet: Bool = false
 
+    @Flag(
+        name: .long,
+        help: "Emit Claude Code PostToolUse hook JSON to stdout and always exit 0. Ignores --quiet."
+    )
+    var claudeHook: Bool = false
+
     func validate() throws {
         let hasCLICondition = metric != nil || gte != nil || severity != nil || message != nil
         let isCompleteCLICondition = metric != nil && gte != nil && severity != nil && message != nil
 
-        if hasCLICondition && !isCompleteCLICondition {
+        if hasCLICondition, !isCompleteCLICondition {
             throw ValidationError(
                 "Simple CLI rules require --metric, --gte, --severity, and --message together."
             )
         }
 
-        if config != nil && hasCLICondition {
+        if config != nil, hasCLICondition {
             throw ValidationError("Use either --config or the simple CLI rule options, not both.")
+        }
+
+        if claudeHook, quiet {
+            throw ValidationError("--claude-hook and --quiet are mutually exclusive.")
         }
     }
 
@@ -49,6 +59,13 @@ struct CheckCommand: ParsableCommand {
         let ruleConfig = try resolveRuleConfig()
         let runner = CheckRunner(config: ruleConfig, diffProvider: diffProvider)
         let result = try runner.run()
+
+        if claudeHook {
+            if let output = result.claudeHookOutput {
+                logger.notice("\(output.jsonString)", metadata: .stdoutOutput)
+            }
+            return
+        }
 
         guard let match = result.match else {
             if !quiet {
