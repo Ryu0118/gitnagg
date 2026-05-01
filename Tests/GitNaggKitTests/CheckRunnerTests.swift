@@ -136,12 +136,13 @@ struct CheckRunnerTests {
     @Test("Rule evaluation", arguments: scenarios)
     func thresholdEvaluation(scenario: CheckScenario) throws {
         let mock = MockGitDiffProvider(result: scenario.stats)
-        let runner = CheckRunner(config: scenario.config, diffProvider: mock)
+        let input = CheckCommandInput(ruleConfig: scenario.config, quiet: false, hookMode: .none)
+        let runner = CheckRunner(input: input, diffProvider: mock)
 
-        let result = try runner.run()
+        let result = try runner.evaluate()
 
         #expect(result.match == scenario.expectedMatch)
-        #expect(result.shouldNag == (scenario.expectedMatch != nil))
+        #expect((result.match != nil) == (scenario.expectedMatch != nil))
         #expect(result.stats == scenario.stats)
     }
 }

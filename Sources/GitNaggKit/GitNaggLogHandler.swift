@@ -1,15 +1,16 @@
 import Foundation
 import Logging
 
-/// A stderr log handler that can emit plain message-only output for user-facing nags.
 package struct GitNaggLogHandler: LogHandler {
     package static let plainOutputMetadataKey = "gitnagg_output"
     package static let plainOutputMetadataValue = "plain"
+    package static let stdoutOutputMetadataKey = "gitnagg_stdout"
+    package static let stdoutOutputMetadataValue = "stdout"
 
     private var handler: StreamLogHandler
 
     package init(label: String, metadataProvider: Logger.MetadataProvider?) {
-        self.handler = StreamLogHandler.standardError(label: label, metadataProvider: metadataProvider)
+        handler = StreamLogHandler.standardError(label: label, metadataProvider: metadataProvider)
     }
 
     package var logLevel: Logger.Level {
@@ -32,55 +33,52 @@ package struct GitNaggLogHandler: LogHandler {
         set { handler[metadataKey: metadataKey] = newValue }
     }
 
-    // swiftlint:disable:next function_parameter_count
-    package func log(
-        level: Logger.Level,
-        message: Logger.Message,
-        metadata: Logger.Metadata?,
-        source: String,
-        file: String,
-        function: String,
-        line: UInt
-    ) {
-        if Self.shouldEmitPlainMessage(metadata) {
-            Self.writePlainMessage(message.description)
+    package func log(event: LogEvent) {
+        if Self.shouldEmitStdoutMessage(event.metadata) {
+            Self.writeStdoutMessage(event.message.description)
             return
         }
 
-        handler.log(
-            level: level,
-            message: message,
-            metadata: metadata,
-            source: source,
-            file: file,
-            function: function,
-            line: line
-        )
+        if Self.shouldEmitPlainMessage(event.metadata) {
+            Self.writePlainMessage(event.message.description)
+            return
+        }
+
+        handler.log(event: event)
     }
 
     private static func shouldEmitPlainMessage(_ metadata: Logger.Metadata?) -> Bool {
-        guard let value = metadata?[plainOutputMetadataKey] else {
-            return false
-        }
+        matches(metadata, key: plainOutputMetadataKey, value: plainOutputMetadataValue)
+    }
 
-        switch value {
-        case .string(let string):
-            return string == plainOutputMetadataValue
-        case .stringConvertible(let stringConvertible):
-            return stringConvertible.description == plainOutputMetadataValue
-        default:
-            return false
+    private static func shouldEmitStdoutMessage(_ metadata: Logger.Metadata?) -> Bool {
+        matches(metadata, key: stdoutOutputMetadataKey, value: stdoutOutputMetadataValue)
+    }
+
+    private static func matches(_ metadata: Logger.Metadata?, key: String, value: String) -> Bool {
+        guard let entry = metadata?[key] else { return false }
+        switch entry {
+        case let .string(string): return string == value
+        case let .stringConvertible(stringConvertible): return stringConvertible.description == value
+        default: return false
         }
     }
 
     private static func writePlainMessage(_ message: String) {
-        let data = Data("\(message)\n".utf8)
-        FileHandle.standardError.write(data)
+        FileHandle.standardError.write(Data("\(message)\n".utf8))
+    }
+
+    private static func writeStdoutMessage(_ message: String) {
+        FileHandle.standardOutput.write(Data("\(message)\n".utf8))
     }
 }
 
 package extension Logger.Metadata {
     static let plainOutput: Self = [
         GitNaggLogHandler.plainOutputMetadataKey: .string(GitNaggLogHandler.plainOutputMetadataValue),
+    ]
+
+    static let stdoutOutput: Self = [
+        GitNaggLogHandler.stdoutOutputMetadataKey: .string(GitNaggLogHandler.stdoutOutputMetadataValue),
     ]
 }

@@ -26,18 +26,42 @@ struct CheckCommand: ParsableCommand {
     @Flag(name: .shortAndLong, help: "Suppress informational output and exit with code 0 even when thresholds exceeded")
     var quiet: Bool = false
 
+    @Flag(
+        name: .long,
+        help: "Emit Claude Code hook JSON to stdout and always exit 0. Mutually exclusive with --codex-hook."
+    )
+    var claudeHook: Bool = false
+
+    @Flag(
+        name: .long,
+        help: "Emit Codex PostToolUse hook JSON to stdout and always exit 0. Mutually exclusive with --claude-hook."
+    )
+    var codexHook: Bool = false
+
     func validate() throws {
         let hasCLICondition = metric != nil || gte != nil || severity != nil || message != nil
         let isCompleteCLICondition = metric != nil && gte != nil && severity != nil && message != nil
 
-        if hasCLICondition && !isCompleteCLICondition {
+        if hasCLICondition, !isCompleteCLICondition {
             throw ValidationError(
                 "Simple CLI rules require --metric, --gte, --severity, and --message together."
             )
         }
 
-        if config != nil && hasCLICondition {
+        if config != nil, hasCLICondition {
             throw ValidationError("Use either --config or the simple CLI rule options, not both.")
+        }
+
+        if claudeHook, codexHook {
+            throw ValidationError("--claude-hook and --codex-hook are mutually exclusive.")
+        }
+
+        if claudeHook, quiet {
+            throw ValidationError("--claude-hook and --quiet are mutually exclusive.")
+        }
+
+        if codexHook, quiet {
+            throw ValidationError("--codex-hook and --quiet are mutually exclusive.")
         }
     }
 
@@ -46,56 +70,27 @@ struct CheckCommand: ParsableCommand {
     }
 
     func execute(diffProvider: any GitDiffProvider) throws {
-        let ruleConfig = try resolveRuleConfig()
-        let runner = CheckRunner(config: ruleConfig, diffProvider: diffProvider)
-        let result = try runner.run()
-
-        guard let match = result.match else {
-            if !quiet {
-                if ruleConfig.rules.isEmpty {
-                    logger.info("No rules configured.")
-                } else {
-                    logger.info("All clear — no rules matched.")
-                }
-            }
-            return
-        }
-
-        logMatch(match)
-
-        if match.severity == .error, !quiet {
-            throw ExitCode(ruleConfig.exitCode)
-        }
-    }
-
-    private func resolveRuleConfig() throws -> RuleConfig {
-        if let metric, let gte, let severity, let message {
-            return RuleConfig.singleRule(
-                metric: metric.value,
+        let hookMode: HookMode = claudeHook ? .claude : codexHook ? .codex : .none
+        do {
+            let input = try CheckArgumentsValidator(
+                metric: metric?.value,
                 gte: gte,
-                severity: severity.value,
-                message: message
-            )
-        }
+                severity: severity?.value,
+                message: message,
+                config: config,
+                quiet: quiet,
+                hookMode: hookMode
+            ).validate()
 
-        let yamlPath = config ?? ConfigLoader.defaultFileName
-        let yamlConfig = ConfigLoader.load(from: yamlPath)
-
-        if config != nil, yamlConfig == nil {
-            logger.warning("Config file not found: \(yamlPath)")
-        }
-
-        return yamlConfig ?? RuleConfig(rules: [])
-    }
-
-    private func logMatch(_ match: NagRule) {
-        switch match.severity {
-        case .info:
-            logger.info("\(match.message)", metadata: .plainOutput)
-        case .warning:
-            logger.warning("\(match.message)", metadata: .plainOutput)
-        case .error:
-            logger.error("\(match.message)", metadata: .plainOutput)
+            _ = try CheckRunner(input: input, diffProvider: diffProvider).run()
+        } catch let error as CheckRunnerError {
+            switch error {
+            case let .exitCode(exitCode):
+                throw ExitCode(exitCode)
+            }
+        } catch {
+            if hookMode != .none { return }
+            throw error
         }
     }
 }

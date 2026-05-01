@@ -12,7 +12,7 @@ struct ConfigParseScenario: CustomTestStringConvertible {
     }
 }
 
-@Suite("ConfigLoader parses rule-based YAML config")
+@Suite
 struct ConfigLoaderTests {
     static let parseScenarios: [ConfigParseScenario] = [
         ConfigParseScenario(

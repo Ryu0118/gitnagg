@@ -1,6 +1,8 @@
+import ArgumentParser
+
+// swiftformat:disable redundantSwiftTestingSuite
 @testable import GitNaggCLI
 @testable import GitNaggKit
-import ArgumentParser
 import Testing
 
 struct ValidationScenario: CustomTestStringConvertible {
@@ -48,6 +50,64 @@ struct CheckCommandTests {
             ),
             shouldThrow: true
         ),
+        ValidationScenario(
+            label: "rejects --claude-hook combined with --quiet",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                quiet: true,
+                claudeHook: true
+            ),
+            shouldThrow: true
+        ),
+        ValidationScenario(
+            label: "accepts --claude-hook without --quiet",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                claudeHook: true
+            ),
+            shouldThrow: false
+        ),
+        ValidationScenario(
+            label: "rejects --codex-hook combined with --quiet",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                quiet: true,
+                codexHook: true
+            ),
+            shouldThrow: true
+        ),
+        ValidationScenario(
+            label: "accepts --codex-hook without --quiet",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                codexHook: true
+            ),
+            shouldThrow: false
+        ),
+        ValidationScenario(
+            label: "rejects --claude-hook combined with --codex-hook",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                claudeHook: true,
+                codexHook: true
+            ),
+            shouldThrow: true
+        ),
     ]
 
     static let exitBehaviorScenarios: [ExitBehaviorScenario] = [
@@ -73,6 +133,54 @@ struct CheckCommandTests {
                 quiet: true
             ),
             stats: DiffStats(added: 150, deleted: 0, filesChanged: 1),
+            shouldThrowExitFailure: false
+        ),
+        ExitBehaviorScenario(
+            label: "--claude-hook: error match does not fail",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                claudeHook: true
+            ),
+            stats: DiffStats(added: 150, deleted: 0, filesChanged: 1),
+            shouldThrowExitFailure: false
+        ),
+        ExitBehaviorScenario(
+            label: "--claude-hook: no match does not fail",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                claudeHook: true
+            ),
+            stats: DiffStats(added: 50, deleted: 0, filesChanged: 1),
+            shouldThrowExitFailure: false
+        ),
+        ExitBehaviorScenario(
+            label: "--codex-hook: error match does not fail",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                codexHook: true
+            ),
+            stats: DiffStats(added: 150, deleted: 0, filesChanged: 1),
+            shouldThrowExitFailure: false
+        ),
+        ExitBehaviorScenario(
+            label: "--codex-hook: no match does not fail",
+            command: makeCommand(
+                metric: .added,
+                gte: 100,
+                severity: .error,
+                message: "Commit now.",
+                codexHook: true
+            ),
+            stats: DiffStats(added: 50, deleted: 0, filesChanged: 1),
             shouldThrowExitFailure: false
         ),
     ]
@@ -110,13 +218,15 @@ struct CheckCommandTests {
         }
     }
 
-    private static func makeCommand(
+    static func makeCommand(
         config: String? = nil,
         metric: MetricOption? = nil,
         gte: Int? = nil,
         severity: SeverityOption? = nil,
         message: String? = nil,
-        quiet: Bool = false
+        quiet: Bool = false,
+        claudeHook: Bool = false,
+        codexHook: Bool = false
     ) -> CheckCommand {
         var command = CheckCommand()
         command.config = config
@@ -125,6 +235,8 @@ struct CheckCommandTests {
         command.severity = severity
         command.message = message
         command.quiet = quiet
+        command.claudeHook = claudeHook
+        command.codexHook = codexHook
         return command
     }
 }
