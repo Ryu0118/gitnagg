@@ -82,6 +82,19 @@ package enum RuleSeverity: String, Codable, Equatable {
     case error
 }
 
+package extension NagRule {
+    func logMatch() {
+        switch severity {
+        case .info:
+            logger.info("\(message)", metadata: .plainOutput)
+        case .warning:
+            logger.warning("\(message)", metadata: .plainOutput)
+        case .error:
+            logger.error("\(message)", metadata: .plainOutput)
+        }
+    }
+}
+
 /// Diff metric that can be used in a condition.
 package enum DiffMetric: String, Codable, Equatable {
     case added

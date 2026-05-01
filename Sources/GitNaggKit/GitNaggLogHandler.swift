@@ -1,7 +1,6 @@
 import Foundation
 import Logging
 
-/// A log handler that routes plain user-facing nags to stderr and hook JSON to stdout.
 package struct GitNaggLogHandler: LogHandler {
     package static let plainOutputMetadataKey = "gitnagg_output"
     package static let plainOutputMetadataValue = "plain"
@@ -34,35 +33,18 @@ package struct GitNaggLogHandler: LogHandler {
         set { handler[metadataKey: metadataKey] = newValue }
     }
 
-    // swiftlint:disable:next function_parameter_count
-    package func log(
-        level: Logger.Level,
-        message: Logger.Message,
-        metadata: Logger.Metadata?,
-        source: String,
-        file: String,
-        function: String,
-        line: UInt
-    ) {
-        if Self.shouldEmitStdoutMessage(metadata) {
-            Self.writeStdoutMessage(message.description)
+    package func log(event: LogEvent) {
+        if Self.shouldEmitStdoutMessage(event.metadata) {
+            Self.writeStdoutMessage(event.message.description)
             return
         }
 
-        if Self.shouldEmitPlainMessage(metadata) {
-            Self.writePlainMessage(message.description)
+        if Self.shouldEmitPlainMessage(event.metadata) {
+            Self.writePlainMessage(event.message.description)
             return
         }
 
-        handler.log(
-            level: level,
-            message: message,
-            metadata: metadata,
-            source: source,
-            file: file,
-            function: function,
-            line: line
-        )
+        handler.log(event: event)
     }
 
     private static func shouldEmitPlainMessage(_ metadata: Logger.Metadata?) -> Bool {

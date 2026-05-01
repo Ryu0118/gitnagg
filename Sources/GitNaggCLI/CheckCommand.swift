@@ -56,16 +56,22 @@ struct CheckCommand: ParsableCommand {
     }
 
     func execute(diffProvider: any GitDiffProvider) throws {
-        let ruleConfig = try resolveRuleConfig()
-        let runner = CheckRunner(config: ruleConfig, diffProvider: diffProvider)
-        let result = try runner.run()
-
         if claudeHook {
-            if let output = result.claudeHookOutput {
-                logger.notice("\(output.jsonString)", metadata: .stdoutOutput)
+            do {
+                let ruleConfig = try resolveRuleConfig()
+                let result = try CheckRunner(config: ruleConfig, diffProvider: diffProvider).run()
+                if let output = result.claudeHookOutput {
+                    logger.notice("\(output.jsonString)", metadata: .stdoutOutput)
+                }
+            } catch {
+                // Swallow errors in hook mode to guarantee exit 0.
             }
             return
         }
+
+        let ruleConfig = try resolveRuleConfig()
+        let runner = CheckRunner(config: ruleConfig, diffProvider: diffProvider)
+        let result = try runner.run()
 
         guard let match = result.match else {
             if !quiet {
@@ -78,7 +84,7 @@ struct CheckCommand: ParsableCommand {
             return
         }
 
-        logMatch(match)
+        match.logMatch()
 
         if match.severity == .error, !quiet {
             throw ExitCode(ruleConfig.exitCode)
@@ -103,17 +109,6 @@ struct CheckCommand: ParsableCommand {
         }
 
         return yamlConfig ?? RuleConfig(rules: [])
-    }
-
-    private func logMatch(_ match: NagRule) {
-        switch match.severity {
-        case .info:
-            logger.info("\(match.message)", metadata: .plainOutput)
-        case .warning:
-            logger.warning("\(match.message)", metadata: .plainOutput)
-        case .error:
-            logger.error("\(match.message)", metadata: .plainOutput)
-        }
     }
 }
 
