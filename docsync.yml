@@ -1,0 +1,41 @@
+rules:
+- name: readme-cli
+  sources:
+  - Sources/GitNaggCLI/CheckCommand.swift
+  - Sources/GitNaggCLI/GitNaggCommand.swift
+  - Sources/GitNaggCLI/Version.swift
+  doc: README.md
+  message: "CLI command surface changed \u2014 update README (Usage, hook integration
+    sections) if flags or behavior changed."
+  checksum: 7ef878aa636e7d09b3f0f002ddc003352a9799acc84cd3b236cb2b93f7ff3af5
+- name: readme-config
+  sources:
+  - Sources/GitNaggKit/RuleConfig.swift
+  - Sources/GitNaggKit/RuleCondition.swift
+  - Sources/GitNaggKit/ConfigLoader.swift
+  - Sources/GitNaggKit/DiffStats.swift
+  - Sources/GitNaggKit/CheckCommandInput.swift
+  - Sources/GitNaggKit/CheckArgumentsValidator.swift
+  doc: README.md
+  message: "Config schema, condition logic, or metrics changed \u2014 update README
+    (.gitnagg.yml format, metrics, operators sections) if the config format changed."
+  checksum: 25ce20fc7534dc0ba9d5b62bbfa80ec7ccfb63522fe6cf8110e42907e772043e
+- name: readme-hook-output
+  sources:
+  - Sources/GitNaggKit/ClaudeHookOutput.swift
+  - Sources/GitNaggKit/Runners/CheckRunner.swift
+  doc: README.md
+  message: "Hook output format or check runner logic changed \u2014 update README
+    (hook integration section) if the JSON output or exit code behavior changed."
+  checksum: 3a03725f9048354faffc1489cb04709b0000c78cc40239e08d5b3cdc80feb43b
+- name: agents-claude
+  sources:
+  - Package.swift
+  - Sources/GitNaggKit/DefaultGitDiffProvider.swift
+  - Sources/GitNaggKit/GitDiffProvider.swift
+  - Sources/GitNaggKit/GitNaggLogHandler.swift
+  - Sources/GitNaggKit/LoggingBootstrap.swift
+  doc: CLAUDE.md
+  message: "Core architecture or git provider changed \u2014 update CLAUDE.md if the
+    architecture description is affected."
+  checksum: 870fe2d8fe138f061ccf3336c84f8b26c93393173b7434d5ecba2cbd989ad03c
