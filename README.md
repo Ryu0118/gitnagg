@@ -33,7 +33,7 @@ nest install Ryu0118/gitnagg
 #### Mise ([jdx/mise](https://github.com/jdx/mise))
 
 ```bash
-mise use -g ubi:Ryu0118/gitnagg
+mise use -g github:Ryu0118/gitnagg
 ```
 
 #### Build from source
