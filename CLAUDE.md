@@ -34,6 +34,10 @@ gitnagg uses ordered rules instead of built-in thresholds.
 - Use `logger` (swift-log) for all output. No `print` statements
 - Add doc comments to non-trivial types and functions whose role is not obvious from the call site
 
+## Documentation
+
+- When documentation and the existing code disagree, follow the conventions used in the existing code, and in your final reply list every inconsistency you found between the documentation and the code.
+
 ## Testing
 
 - Tests live in `Tests/GitNaggKitTests/`
