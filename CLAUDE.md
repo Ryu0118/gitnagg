@@ -1,6 +1,6 @@
 # gitnagg
 
-CLI tool that monitors uncommitted git changes and nags you to commit when thresholds are exceeded. Designed as a hook executable for Claude Code Hooks.
+CLI tool that monitors uncommitted git changes and warns when an ordered rule matches. Designed as a hook executable for Claude Code (`--claude-hook`) and Codex (`--codex-hook`).
 
 ## Commands
 
@@ -47,14 +47,19 @@ gitnagg uses ordered rules instead of built-in thresholds.
 
 ## CI/CD
 
-- `.github/workflows/test.yml` — SwiftLint + macOS unit tests on push/PR
-- `.github/workflows/publish-release.yml` — workflow_dispatch で macOS universal binary をビルドし GitHub Release を作成
+- `.github/workflows/test.yml` — SwiftLint and macOS unit tests on push and pull requests to `main`. Runs only when `Sources/**`, `Tests/**`, `Package.swift`, `Package.resolved`, `.swiftlint.yml`, `nestfile.yaml`, `scripts/nest.sh`, or the workflow file changes. Docs-only changes skip this workflow.
+- `.github/workflows/docsync-check.yml` — Docsync Check on every push and pull request to `main`.
+- `.github/workflows/gitleaks.yml` — gitleaks secret scan on push, pull request, and `workflow_dispatch`.
+- `.github/workflows/update-nestfile.yml` — daily at 00:00 UTC and on `workflow_dispatch`. Updates `nestfile.yaml` and opens a pull request when the file changes.
+- `.github/workflows/publish-release.yml` — `workflow_dispatch` builds a macOS universal binary and creates a GitHub Release.
 
 ## Hook Integration
 
-gitnagg is intended to be used as a Claude Code PostToolUse hook in `.claude/settings.json`.
+gitnagg is a PostToolUse hook for Claude Code and Codex. `--claude-hook` and `--codex-hook` write the same JSON to stdout and always exit 0. They are mutually exclusive with each other and with `--quiet`.
 
-PostToolUse hooks require **exit 0** and **JSON stdout** (`{"decision":"block","reason":"..."}`) to surface output to Claude. `gitnagg check --claude-hook` emits that JSON natively and always exits 0, so no wrapper script is required.
+### Claude Code
+
+PostToolUse hooks require **exit 0** and **JSON stdout** (`{"decision":"block","reason":"..."}`) to surface output to Claude. `gitnagg check --claude-hook` emits that JSON natively, so no wrapper script is required. Add it to `.claude/settings.json`.
 
 ### settings.json
 
@@ -81,6 +86,10 @@ PostToolUse hooks require **exit 0** and **JSON stdout** (`{"decision":"block","
 1. After each Edit/Write, the hook runs `gitnagg check --claude-hook`
 2. If an ordered rule matches, gitnagg writes `{"decision":"block","reason":"<rule message>"}` to stdout and exits 0
 3. If no rule matches, gitnagg writes nothing and exits 0
-4. `--claude-hook` also exits 0 when config loading or git diff collection fails. It is mutually exclusive with `--quiet` and `--codex-hook`
+4. `--claude-hook` also exits 0 when config loading or git diff collection fails
+
+### Codex
+
+`gitnagg check --codex-hook` uses the same contract. A matching rule writes `{"decision":"block","reason":"<rule message>"}` to stdout. No match writes nothing. The process exits 0 even when config loading or git diff collection fails.
 
 Rules come from `.gitnagg.yml` in the project root and are evaluated top to bottom with `resolution: first-match`. The first matching rule is the one emitted. `--metric`, `--gte`, `--severity`, and `--message` together are a single-rule shortcut that replaces the YAML file; they are mutually exclusive with `--config` and do not override rules already listed in that file.

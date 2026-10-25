@@ -104,7 +104,7 @@ rules:
 - `when` supports a single condition, `and`, or `or`.
 - Supported metrics are `added`, `deleted`, and `files`.
 - The only comparison operator today is `gte` (`>=`).
-- There are no built-in default rules. If you configure nothing, gitnagg does nothing.
+- There are no built-in default rules. With no rules configured, gitnagg logs `No rules configured.` and exits 0. `--quiet` suppresses that line.
 - In normal CLI mode, `severity: error` exits with the configured `exit_code` (default: `2`) unless `--quiet` is used.
 - In normal CLI mode, `info` and `warning` rules stay at exit code `0`.
 - In hook modes (`--claude-hook` or `--codex-hook`), gitnagg always exits with code `0` and emits hook JSON to stdout only when a rule matches.
@@ -125,7 +125,8 @@ gitnagg check \
   --severity warning \
   --message "Good checkpoint. Commit before the diff grows further."
 
-# Quiet mode (exit 0 even when thresholds exceeded, just print warning)
+# Quiet mode: print the matched rule message at its severity and exit 0.
+# Suppresses the no-match info line.
 gitnagg check --quiet
 
 # Claude Code PostToolUse hook mode
@@ -154,7 +155,7 @@ The output schema is intentionally compatible with Claude Code and Codex `PostTo
 
 By default, gitnagg exits with code **2** when the matched rule uses `severity: error`.
 
-With `--quiet`, gitnagg still prints the matched message to stderr but always exits with code **0**. Use hook flags instead of `--quiet` for Claude Code or Codex integration.
+With `--quiet`, gitnagg still prints the matched rule message to stderr at that rule's severity (`info`, `warning`, or `error`) and always exits with code **0**. When nothing matches, `--quiet` suppresses the informational line (`No rules configured.` or `All clear — no rules matched.`). Use hook flags instead of `--quiet` for Claude Code or Codex integration.
 
 ### `exit_code` (YAML)
 
